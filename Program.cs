@@ -1,17 +1,22 @@
-using JaveragesLibrary.Data; // 👈 Asegúrate de tener este using
+using JaveragesLibrary.Data;
 using JaveragesLibrary.Services.Features.Mangas;
+using JaveragesLibrary.Services.Features.Prestamos;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer; 
+using Microsoft.IdentityModel.Tokens;               
+using System.Text;                                 
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 💾 Agrega la conexión a tu base de datos en Somee (esto es LO QUE FALTABA)
+// 💾 Conexión a la base de datos (Somee)
 builder.Services.AddDbContext<MangaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MangaDb")));
 
-// ✅ Registro del servicio Manga
+// ✅ Servicios
 builder.Services.AddScoped<MangaService>();
+builder.Services.AddScoped<PrestamoService>();
 
-// 🎯 Controladores y Swagger
+// ✅ Controladores y Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -29,9 +34,28 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is missing.")))        };
+    });
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
-// 🚀 Configurar Swagger en desarrollo
+// 🔧 Swagger solo en desarrollo
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -43,6 +67,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
